@@ -3,7 +3,7 @@
 #include <string>
 #include <fstream>
 #include <unistd.h>
-#include "jpeglib.h"
+#include "/opt/libjpeg-turbo/include/jpeglib.h"
 #include "JPEGFile.h"
 using namespace std;
 
@@ -215,10 +215,6 @@ int main(int argc, char** argv) {
             if((i + 1) < argc) {
                 outputFile = argv[i+1];
             }
-            else {
-                help(argv[0]);
-                return -1;
-            }
         }
 
         else if(string(argv[i]) == "-i") {
@@ -235,10 +231,6 @@ int main(int argc, char** argv) {
             if((i + 1) < argc) {
                 message = argv[i+1];
             }
-            else {
-                help(argv[0]);
-                return -1;
-            }
         }
 
         else if(string(argv[i]) == "-e") {
@@ -249,7 +241,12 @@ int main(int argc, char** argv) {
         }
     }
 
-    if ((encode == decode) || (message == nullptr)) {
+    if (encode == decode) {
+        help(argv[0]);
+        return -1;
+    }
+
+    if ((encode == true) && ((message == nullptr) || (outputFile == nullptr))) {
         help(argv[0]);
         return -1;
     }
@@ -261,12 +258,28 @@ int main(int argc, char** argv) {
     }
 
     if(encode) {
+        printf("[*] Encoding...\n");
         if(jpegFile->ReadJPEGFile() == 0) {
             delete jpegFile;
             return -1;
         }
+
+        printf("[+] ReadJPEG OK\n");
         jpegFile->HideMessage(message);
-        jpegFile->WriteJPEGFile(95);       
+        printf("[+] HideMessage OK\n");
+        jpegFile->WriteJPEGFile(100, 12);       
+        printf("[+] WriteJPEGFile OK\n");
+    }
+    else if(decode) {
+
+        printf("[*] Decoding...\n");
+        if(jpegFile->ReadJPEGFile() == 0) {
+            delete jpegFile;
+            return -1;
+        }
+        printf("[+] ReadJPEG OK\n");
+
+        jpegFile->DecodeMessage();
     }
 
     delete jpegFile;

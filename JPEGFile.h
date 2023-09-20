@@ -7,7 +7,10 @@
 #include <string>
 #include <fstream>
 #include <unistd.h>
-#include "jpeglib.h"
+#include <vector>
+#include "/opt/libjpeg-turbo/include/jpeglib.h"
+#include "jerror.h"
+using namespace std;
 
 class JPEGFile {
 
@@ -19,13 +22,24 @@ class JPEGFile {
         unsigned long long image_height;
         unsigned long long data_size;
         size_t messageLength;
+        unsigned int* HeightInBlocks;
+        unsigned int* WidthInBlocks;
+        jvirt_barray_ptr *DctCoeff;
+
+        static const unsigned int CoeffPerBlock = 64;
+        unsigned int DivRoundUp(unsigned int x, unsigned int y);
+        vector<signed short> LinDctCoeffs;
+
+        struct jpeg_compress_struct cinfo ;
+        struct jpeg_decompress_struct decinfo ;
 
     public:
         JPEGFile() = delete;
         explicit JPEGFile(const char* filename, const char* outputFile);
         int ReadJPEGFile();
         bool HideMessage(const char* message);
-        void WriteJPEGFile (int quality);
+        bool DecodeMessage();
+        void WriteJPEGFile (int quality, int data_precision);
         ~JPEGFile();
 };
 
