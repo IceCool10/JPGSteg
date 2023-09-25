@@ -23,17 +23,22 @@ bool JPEGFile::HideMessage(const char* message) {
         return false;
     }
 
-    size_t bitOffset = 0;
+    //size_t bitOffset = 63;
+    size_t linearDCTOffset = 0;
     
     for(size_t i = 0; i < msgLength; i++) {
         char c = message[i];
         for(unsigned short bit = 0; bit < 8; bit++) {
-            LinDctCoeffs[bitOffset] = ((LinDctCoeffs[bitOffset] & 0xFE)  | ((c >> (8 - bit - 1)) & 1));
+            while(LinDctCoeffs[linearDCTOffset] <= 1) {
+                linearDCTOffset++;
+            }
+            LinDctCoeffs[linearDCTOffset] = ((LinDctCoeffs[linearDCTOffset] & 0xFE)  | ((c >> (8 - bit - 1)) & 1));
             //printf("%02X ", jdata[bitOffset]);
-            bitOffset++;
+            linearDCTOffset++;
+            this->messageLength++; // (CMD) Message length as bits
         }
     }
-    this->messageLength = bitOffset;
+    //this->messageLength = bitOffset;
     /*
     printf("\nSTART\n");
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
@@ -68,13 +73,19 @@ bool JPEGFile::DecodeMessage() {
 
     printf("\nthis->msgLen : %16llX\n", msgLen);
     string message(msgLen, '\0');
+    size_t linearDCTOffset = 0;
 
+    
     for(size_t i = 0; i < msgLen / 8; i++) {
         for(unsigned short bit = 0; bit < 8; bit++) {
-            message[i] |= ((LinDctCoeffs[i*8 + bit] & 1) << (8 - bit - 1));
+            while(LinDctCoeffs[linearDCTOffset] <= 1) {
+                linearDCTOffset++;
+            }
+            message[i] |= ((LinDctCoeffs[linearDCTOffset++] & 1) << (8 - bit - 1));
         }
 
     }
+    
     message[msgLen * 8] = '\0';
     printf("[*] HIDDEN MESSAGE : %s\n", message.c_str());
     /*
@@ -149,7 +160,7 @@ int JPEGFile::ReadJPEGFile ()
 
     (void) jpeg_read_header(&decinfo, TRUE);
 
-    // (CMD) ReaDCT coefficients
+    // (CMD) ReadDCT coefficients
     this->DctCoeff = jpeg_read_coefficients(&decinfo);
 
     unsigned int maxVSampleFactorW = 0;
@@ -182,6 +193,7 @@ int JPEGFile::ReadJPEGFile ()
     
     LinDctCoeffs.resize(totalNumCoeff);
     this->data_size = totalNumCoeff;
+    printf("this->data_size : %16llX\n", this->data_size);
 
     unsigned int linindex = 0;
     for (unsigned short icomp = 0 ; icomp < decinfo.num_components ; icomp++) {
@@ -252,6 +264,7 @@ int JPEGFile::ReadJPEGFile ()
      */
     this->image_width  = decinfo.output_width;
     this->image_height = decinfo.output_height;
+    printf("img pixels : %16llX\n", this->image_width * this->image_height);
 
     //this->data_size = this->image_width * this->image_height * 3;
     //printf("data_size : %16llX\n", data_size);
