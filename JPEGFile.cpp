@@ -46,8 +46,12 @@ bool JPEGFile::HideMessage(const char* message) {
     }
     */
     printf("\nthis->messageLength : %16llX\n", this->messageLength);
+    linearDCTOffset = data_size - 1;
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
-        LinDctCoeffs[data_size - 1 - i] = ((LinDctCoeffs[data_size - 1 - i] & 0xFE) | (this->messageLength & 1));
+        while(LinDctCoeffs[linearDCTOffset] <= 1) {
+            linearDCTOffset--;
+        }
+        LinDctCoeffs[linearDCTOffset - i] = ((LinDctCoeffs[linearDCTOffset - i] & 0xFE) | (this->messageLength & 1));
         this->messageLength >>= 1;
         //printf("%02X ", (LinDctCoeffs[data_size - 1 - i ] & 1));
     }
@@ -65,15 +69,19 @@ bool JPEGFile::DecodeMessage() {
     }
     */
 
+    size_t linearDCTOffset = data_size - 1;
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
-        msgLen |= (LinDctCoeffs[data_size - 1 - (sizeof(size_t) * 8)+ i] & 1);
+        while(LinDctCoeffs[linearDCTOffset] <= 1) {
+            linearDCTOffset--;
+        }
+        msgLen |= (LinDctCoeffs[linearDCTOffset - (sizeof(size_t) * 8)+ i] & 1);
 
         msgLen <<=1;
     }
 
     printf("\nthis->msgLen : %16llX\n", msgLen);
     string message(msgLen, '\0');
-    size_t linearDCTOffset = 0;
+    linearDCTOffset = 0;
 
     
     for(size_t i = 0; i < msgLen / 8; i++) {
