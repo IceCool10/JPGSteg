@@ -17,35 +17,39 @@ JPEGFile::JPEGFile(const char* filename, const char* outputFile) {
 
 bool JPEGFile::HideMessage(const char* message) {
 
-    string msg = string(message);
-    size_t msgLength = msg.length();
-    if (msgLength * 8 >= data_size - sizeof(size_t) * 8) {
+    this->lzmaDecoder = new LzmaDecoder(string(message));
+    if (!this->lzmaDecoder) {
+        return false;
+    }
+    unsigned int compressedSize = 0;
+    unique_ptr<unsigned char[]> compressedMessagePtr = this->lzmaDecoder->lzmaCompress(&compressedSize);
+    
+    if (compressedSize * 8 >= data_size - sizeof(size_t) * 8) {
         return false;
     }
 
-    //size_t bitOffset = 63;
+    const unsigned char* compressedMessage = compressedMessagePtr.get();
+
     size_t linearDCTOffset = 0;
     
-    for(size_t i = 0; i < msgLength; i++) {
-        char c = message[i];
+    for(size_t i = 0; i < compressedSize; i++) {
+        char c = compressedMessage[i];
         for(unsigned short bit = 0; bit < 8; bit++) {
             while(LinDctCoeffs[linearDCTOffset] <= 1) {
                 linearDCTOffset++;
             }
             LinDctCoeffs[linearDCTOffset] = ((LinDctCoeffs[linearDCTOffset] & 0xFE)  | ((c >> (8 - bit - 1)) & 1));
-            //printf("%02X ", jdata[bitOffset]);
             linearDCTOffset++;
             this->messageLength++; // (CMD) Message length as bits
         }
     }
-    //this->messageLength = bitOffset;
     /*
     printf("\nSTART\n");
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
         printf("%02X ", (LinDctCoeffs[i] & 1));
     }
     */
-    printf("\nthis->messageLength : %16llX\n", this->messageLength);
+    //printf("\nthis->messageLength : %16llX\n", this->messageLength);
     linearDCTOffset = data_size - 1;
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
         while(LinDctCoeffs[linearDCTOffset] <= 1) {
@@ -53,7 +57,6 @@ bool JPEGFile::HideMessage(const char* message) {
         }
         LinDctCoeffs[linearDCTOffset - i] = ((LinDctCoeffs[linearDCTOffset - i] & 0xFE) | (this->messageLength & 1));
         this->messageLength >>= 1;
-        //printf("%02X ", (LinDctCoeffs[data_size - 1 - i ] & 1));
     }
 
     return true;
@@ -62,12 +65,6 @@ bool JPEGFile::HideMessage(const char* message) {
 bool JPEGFile::DecodeMessage() {
     
     size_t msgLen = 0;
-    /*
-    printf("\nSTART\n");
-    for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
-        printf("%02X ", (LinDctCoeffs[i] & 1));
-    }
-    */
 
     size_t linearDCTOffset = data_size - 1;
     for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
@@ -79,11 +76,10 @@ bool JPEGFile::DecodeMessage() {
         msgLen <<=1;
     }
 
-    printf("\nthis->msgLen : %16llX\n", msgLen);
+    //printf("\nthis->msgLen : %16llX\n", msgLen);
     string message(msgLen, '\0');
     linearDCTOffset = 0;
 
-    
     for(size_t i = 0; i < msgLen / 8; i++) {
         for(unsigned short bit = 0; bit < 8; bit++) {
             while(LinDctCoeffs[linearDCTOffset] <= 1) {
@@ -94,14 +90,17 @@ bool JPEGFile::DecodeMessage() {
 
     }
     
-    message[msgLen * 8] = '\0';
-    printf("[*] HIDDEN MESSAGE : %s\n", message.c_str());
-    /*
-    printf("\nEND\n");
-    for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
-        printf("%02X ", (LinDctCoeffs[data_size - 1 - i] & 1));
+    this->lzmaDecoder = new LzmaDecoder(message);
+    if (!this->lzmaDecoder) {
+        return false;
     }
-    */
+
+
+    unsigned int decompressedSize = 0;
+    unique_ptr<unsigned char[]> decompressedMessagePtr = this->lzmaDecoder->lzmaDecompress(&decompressedSize);
+    unsigned char* decompressedMessage = decompressedMessagePtr.get();
+    decompressedMessage[decompressedSize] = '\0';
+    printf("[*] HIDDEN MESSAGE : %s\n", decompressedMessage);
     return true;
 }
 
@@ -201,7 +200,7 @@ int JPEGFile::ReadJPEGFile ()
     
     LinDctCoeffs.resize(totalNumCoeff);
     this->data_size = totalNumCoeff;
-    printf("this->data_size : %16llX\n", this->data_size);
+    //printf("this->data_size : %16llX\n", this->data_size);
 
     unsigned int linindex = 0;
     for (unsigned short icomp = 0 ; icomp < decinfo.num_components ; icomp++) {
@@ -215,12 +214,6 @@ int JPEGFile::ReadJPEGFile ()
 					for (unsigned int icoeff = 0 ; icoeff < CoeffPerBlock ; icoeff++) {
 						LinDctCoeffs[linindex] = array[irow][iblock][icoeff] ;
 
-						// don't use zero dct coefficients to embed data
-                        /*
-						if (LinDctCoeffs[linindex] != 0) {
-							StegoIndices.push_back (linindex) ;
-						}
-                        */
 						linindex++ ;
 					}
 				}
@@ -272,7 +265,6 @@ int JPEGFile::ReadJPEGFile ()
      */
     this->image_width  = decinfo.output_width;
     this->image_height = decinfo.output_height;
-    printf("img pixels : %16llX\n", this->image_width * this->image_height);
 
     //this->data_size = this->image_width * this->image_height * 3;
     //printf("data_size : %16llX\n", data_size);
@@ -440,4 +432,7 @@ JPEGFile::~JPEGFile() {
 	if (HeightInBlocks) {
 		delete[] HeightInBlocks ;
 	}
+    if (this->lzmaDecoder) {
+        delete this->lzmaDecoder;
+    }
 }

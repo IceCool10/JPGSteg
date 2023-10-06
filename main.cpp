@@ -4,6 +4,7 @@
 #include <fstream>
 #include <unistd.h>
 #include "/opt/libjpeg-turbo/include/jpeglib.h"
+#include "lz4.h"
 #include "JPEGFile.h"
 using namespace std;
 
