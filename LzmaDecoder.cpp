@@ -3,7 +3,7 @@
 #include <cstring>
 using namespace std;
 
-std::unique_ptr<uint8_t[]> LzmaDecoder::lzmaDecompress(uint32_t* outputSize) {
+std::unique_ptr<uint8_t[]> LzmaDecoder::Decompress(uint32_t* outputSize) {
 
     const uint8_t* input = (const uint8_t*)this->message.c_str();
     unsigned int inputSize = this->message.size();
@@ -32,7 +32,7 @@ std::unique_ptr<uint8_t[]> LzmaDecoder::lzmaDecompress(uint32_t* outputSize) {
 }
 
 
-std::unique_ptr<uint8_t[]> LzmaDecoder::lzmaCompress(uint32_t *outputSize) {
+std::unique_ptr<uint8_t[]> LzmaDecoder::Compress(uint32_t *outputSize) {
 
     const uint8_t* input = (const uint8_t*)this->message.c_str();
     unsigned int inputSize = this->message.size();

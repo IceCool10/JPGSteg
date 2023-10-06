@@ -6,8 +6,11 @@
 #include <stdint.h>
 #include <string>
 #include <memory>
+
 #include "lzma/LzmaEnc.h"
 #include "lzma/LzmaDec.h"
+
+#include "Decoder.h"
 using namespace std;
 
 static void *_lzmaAlloc(ISzAllocPtr, size_t size) {
@@ -24,16 +27,14 @@ static ISzAlloc _allocFuncs = {
     _lzmaAlloc, _lzmaFree
 };
 
-class LzmaDecoder {
+class LzmaDecoder : public Decoder {
 
-    private:
-        string message;
     public:
 
         LzmaDecoder() = delete;
         explicit LzmaDecoder(string message);
-        std::unique_ptr<uint8_t[]> lzmaCompress(uint32_t *outputSize);
-        std::unique_ptr<uint8_t[]> lzmaDecompress(uint32_t *outputSize);
+        virtual std::unique_ptr<uint8_t[]> Compress(uint32_t *outputSize);
+        virtual std::unique_ptr<uint8_t[]> Decompress(uint32_t *outputSize);
 
 };
 

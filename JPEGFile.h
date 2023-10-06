@@ -11,6 +11,7 @@
 #include "/opt/libjpeg-turbo/include/jpeglib.h"
 #include "jerror.h"
 #include "LzmaDecoder.h"
+#include "Decoder.h"
 using namespace std;
 
 class JPEGFile {
@@ -33,7 +34,7 @@ class JPEGFile {
 
         struct jpeg_compress_struct cinfo ;
         struct jpeg_decompress_struct decinfo ;
-        LzmaDecoder* lzmaDecoder;
+        Decoder* lzmaDecoder;
         
 
     public:

@@ -3,6 +3,8 @@
 #include "/opt/libjpeg-turbo/include/jpeglib.h"
 using namespace std;
 
+#define NUMBER_OF_BITS 8
+
 JPEGFile::JPEGFile(const char* filename, const char* outputFile) {
 
     this->filename = filename;
@@ -22,9 +24,9 @@ bool JPEGFile::HideMessage(const char* message) {
         return false;
     }
     unsigned int compressedSize = 0;
-    unique_ptr<unsigned char[]> compressedMessagePtr = this->lzmaDecoder->lzmaCompress(&compressedSize);
+    unique_ptr<unsigned char[]> compressedMessagePtr = this->lzmaDecoder->Compress(&compressedSize);
     
-    if (compressedSize * 8 >= data_size - sizeof(size_t) * 8) {
+    if (compressedSize * NUMBER_OF_BITS >= data_size - sizeof(size_t) * NUMBER_OF_BITS) {
         return false;
     }
 
@@ -34,11 +36,11 @@ bool JPEGFile::HideMessage(const char* message) {
     
     for(size_t i = 0; i < compressedSize; i++) {
         char c = compressedMessage[i];
-        for(unsigned short bit = 0; bit < 8; bit++) {
+        for(unsigned short bit = 0; bit < NUMBER_OF_BITS; bit++) {
             while(LinDctCoeffs[linearDCTOffset] <= 1) {
                 linearDCTOffset++;
             }
-            LinDctCoeffs[linearDCTOffset] = ((LinDctCoeffs[linearDCTOffset] & 0xFE)  | ((c >> (8 - bit - 1)) & 1));
+            LinDctCoeffs[linearDCTOffset] = ((LinDctCoeffs[linearDCTOffset] & 0xFE)  | ((c >> (NUMBER_OF_BITS - bit - 1)) & 1));
             linearDCTOffset++;
             this->messageLength++; // (CMD) Message length as bits
         }
@@ -51,7 +53,7 @@ bool JPEGFile::HideMessage(const char* message) {
     */
     //printf("\nthis->messageLength : %16llX\n", this->messageLength);
     linearDCTOffset = data_size - 1;
-    for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
+    for(size_t i = 0; i < (sizeof(size_t) * NUMBER_OF_BITS); i++) {
         while(LinDctCoeffs[linearDCTOffset] <= 1) {
             linearDCTOffset--;
         }
@@ -67,11 +69,11 @@ bool JPEGFile::DecodeMessage() {
     size_t msgLen = 0;
 
     size_t linearDCTOffset = data_size - 1;
-    for(size_t i = 0; i < (sizeof(size_t) * 8); i++) {
+    for(size_t i = 0; i < (sizeof(size_t) * NUMBER_OF_BITS); i++) {
         while(LinDctCoeffs[linearDCTOffset] <= 1) {
             linearDCTOffset--;
         }
-        msgLen |= (LinDctCoeffs[linearDCTOffset - (sizeof(size_t) * 8)+ i] & 1);
+        msgLen |= (LinDctCoeffs[linearDCTOffset - (sizeof(size_t) * NUMBER_OF_BITS) + i] & 1);
 
         msgLen <<=1;
     }
@@ -80,12 +82,12 @@ bool JPEGFile::DecodeMessage() {
     string message(msgLen, '\0');
     linearDCTOffset = 0;
 
-    for(size_t i = 0; i < msgLen / 8; i++) {
-        for(unsigned short bit = 0; bit < 8; bit++) {
+    for(size_t i = 0; i < msgLen / NUMBER_OF_BITS; i++) {
+        for(unsigned short bit = 0; bit < NUMBER_OF_BITS; bit++) {
             while(LinDctCoeffs[linearDCTOffset] <= 1) {
                 linearDCTOffset++;
             }
-            message[i] |= ((LinDctCoeffs[linearDCTOffset++] & 1) << (8 - bit - 1));
+            message[i] |= ((LinDctCoeffs[linearDCTOffset++] & 1) << (NUMBER_OF_BITS - bit - 1));
         }
 
     }
@@ -97,9 +99,10 @@ bool JPEGFile::DecodeMessage() {
 
 
     unsigned int decompressedSize = 0;
-    unique_ptr<unsigned char[]> decompressedMessagePtr = this->lzmaDecoder->lzmaDecompress(&decompressedSize);
+    unique_ptr<unsigned char[]> decompressedMessagePtr = this->lzmaDecoder->Decompress(&decompressedSize);
     unsigned char* decompressedMessage = decompressedMessagePtr.get();
     decompressedMessage[decompressedSize] = '\0';
+
     printf("[*] HIDDEN MESSAGE : %s\n", decompressedMessage);
     return true;
 }
@@ -186,10 +189,8 @@ int JPEGFile::ReadJPEGFile ()
 	this->WidthInBlocks = new unsigned int[decinfo.num_components] ;
 
     for (unsigned short icomp = 0 ; icomp < decinfo.num_components ; icomp++) {
-		HeightInBlocks[icomp] = this->DivRoundUp(decinfo.image_height * decinfo.comp_info[icomp].v_samp_factor,
-																	8 * maxVSampleFactorW) ;
-		WidthInBlocks[icomp] = this->DivRoundUp(decinfo.image_width * decinfo.comp_info[icomp].h_samp_factor,
-																	8 * maxVSampleFactorH) ;
+		HeightInBlocks[icomp] = this->DivRoundUp(decinfo.image_height * decinfo.comp_info[icomp].v_samp_factor, 8 * maxVSampleFactorW) ;
+		WidthInBlocks[icomp] = this->DivRoundUp(decinfo.image_width * decinfo.comp_info[icomp].h_samp_factor,	8 * maxVSampleFactorH) ;
 	}
 
     unsigned long totalNumCoeff = 0;
