@@ -101,7 +101,7 @@ bool JPEGFile::DecodeMessage() {
     unsigned int decompressedSize = 0;
     unique_ptr<unsigned char[]> decompressedMessagePtr = this->lzmaDecoder->Decompress(&decompressedSize);
     unsigned char* decompressedMessage = decompressedMessagePtr.get();
-    decompressedMessage[decompressedSize] = '\0';
+    decompressedMessage[decompressedSize - 1] = '\0';
 
     printf("[*] HIDDEN MESSAGE : %s\n", decompressedMessage);
     return true;
